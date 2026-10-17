@@ -1,12 +1,16 @@
+
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import URL, create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DATABASE_URL = (
-    f"mysql+pymysql://{os.environ['MYSQL_USER']}:"
-    f"{os.environ['MYSQL_PASSWORD']}@mysql:3306/"
-    f"{os.environ['MYSQL_DATABASE']}"
+DATABASE_URL = URL.create(
+    drivername="mysql+pymysql",
+    username=os.environ["MYSQL_USER"],
+    password=os.environ["MYSQL_PASSWORD"],
+    host="mysql",
+    port=3306,
+    database=os.environ["MYSQL_DATABASE"],
 )
 
 engine = create_engine(
