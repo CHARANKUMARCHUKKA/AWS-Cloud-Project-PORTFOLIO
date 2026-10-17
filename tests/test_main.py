@@ -1,12 +1,49 @@
+
+import os
+
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import URL, create_engine
+from sqlalchemy.orm import sessionmaker
 
-from app.main import app, tasks
+from app.database import Base
+from app.main import app, get_db
 
+TEST_DATABASE_URL = URL.create(
+    drivername="mysql+pymysql",
+    username=os.environ["MYSQL_USER"],
+    password=os.environ["MYSQL_PASSWORD"],
+    host="127.0.0.1",
+    port=3307,
+    database="tasks_test_db",
+)
+
+test_engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+TestSessionLocal = sessionmaker(
+    bind=test_engine,
+    autoflush=False,
+    autocommit=False,
+)
+
+
+def override_get_db():
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
 
-def setup_function():
-    tasks.clear()
+@pytest.fixture(autouse=True)
+def reset_test_database():
+    Base.metadata.create_all(bind=test_engine)
+    with test_engine.begin() as connection:
+        connection.exec_driver_sql("DELETE FROM tasks")
+    yield
 
 
 def test_health():
@@ -51,7 +88,7 @@ def test_delete_task():
 
 
 def test_missing_task_returns_404():
-    response = client.get("/tasks/999")
+    response = client.get("/tasks/999999")
     assert response.status_code == 404
 
 
