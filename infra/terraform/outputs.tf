@@ -33,3 +33,7 @@ output "database_security_group_id" {
   description = "Security group ID for the database."
   value       = aws_security_group.database.id
 }
+output "ecr_repository_url" {
+  description = "URL of the ECR repository for the API image."
+  value       = aws_ecr_repository.api.repository_url
+}
