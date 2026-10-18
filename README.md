@@ -1,39 +1,39 @@
-# AWS Production-Style Task Management API
+# AWS CLOUD ENGINEERING PROJECT
 
-A cloud engineering portfolio project built with Python, FastAPI,
-Docker, Terraform, and AWS.
+## TASK MANAGEMENT REST API
 
-## Features
-- REST API for task management
-- Automated tests using pytest
-- Docker containerization
-- Planned AWS deployment using ECS Fargate
-- Planned infrastructure automation using Terraform
-- Planned CI/CD and CloudWatch monitoring
+A cloud engineering portfolio project built with FastAPI, MySQL, Docker, Terraform, and AWS.
 
-## Local development
+**Project status:** Local application working; AWS infrastructure and deployment are in progress.
 
-Create and activate a virtual environment, then install dependencies:
+## TECHNOLOGIES
 
-    python -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    pip install -r requirements.txt
+- Python
+- FastAPI
+- MySQL
+- SQLAlchemy
+- Docker
+- Docker Compose
+- Terraform
+- Amazon Web Services (AWS)
 
-Run tests:
+## PROJECT GOAL
 
-    python -m pytest -v
+Build and deploy a secure, monitored, and cost-conscious task management API using cloud engineering practices.
 
-Run the API:
+## CURRENT STATUS
 
-    uvicorn app.main:app --reload
+- Local API and database integration
+- Docker-based development environment
+- Automated application tests
+- Terraform infrastructure setup in progress
+- AWS deployment planned
 
-API documentation: http://127.0.0.1:8000/docs
+## FUTURE WORK
 
-## Project status
-
-Local API tests pass. Docker deployment and AWS infrastructure
-are still being verified or implemented.
-
-## Security
-Never commit AWS credentials, environment secrets, private keys,
-or Terraform state files.
+- AWS networking and security
+- Amazon ECR and ECS Fargate
+- Amazon RDS for MySQL
+- GitHub Actions CI/CD with AWS OIDC
+- Amazon CloudWatch monitoring
+- Infrastructure cost and security review
