@@ -15,3 +15,8 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+variable "project_name" {
+  description = "Short name used for project resources."
+  type        = string
+  default     = "aws-cloud-project-portfolio"
+}
