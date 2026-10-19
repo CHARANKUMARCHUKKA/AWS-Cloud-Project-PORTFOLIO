@@ -1,26 +1,13 @@
 
-import os
-
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import URL, create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.database import Base
+from app.database import Base, engine
 from app.main import app, get_db
 
-TEST_DATABASE_URL = URL.create(
-    drivername="mysql+pymysql",
-    username=os.environ["MYSQL_USER"],
-    password=os.environ["MYSQL_PASSWORD"],
-    host="127.0.0.1",
-    port=3307,
-    database="tasks_test_db",
-)
-
-test_engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
 TestSessionLocal = sessionmaker(
-    bind=test_engine,
+    bind=engine,
     autoflush=False,
     autocommit=False,
 )
@@ -40,8 +27,8 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def reset_test_database():
-    Base.metadata.create_all(bind=test_engine)
-    with test_engine.begin() as connection:
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
         connection.exec_driver_sql("DELETE FROM tasks")
     yield
 
@@ -50,6 +37,12 @@ def test_health():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "healthy"}
+
+
+def test_readiness():
+    response = client.get("/ready")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready"}
 
 
 def test_create_and_list_task():

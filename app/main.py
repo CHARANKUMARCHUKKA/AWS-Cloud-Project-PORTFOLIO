@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database import Base, SessionLocal, engine
@@ -45,6 +46,15 @@ app = FastAPI(
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/ready")
+def readiness(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError as error:
+        raise HTTPException(status_code=503, detail="Database is unavailable") from error
+    return {"status": "ready"}
 
 
 @app.get("/tasks", response_model=list[TaskResponse])
