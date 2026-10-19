@@ -1,6 +1,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, engine
@@ -43,6 +44,39 @@ def test_readiness():
     response = client.get("/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ready"}
+
+
+def test_liveness_when_database_is_unavailable():
+    def unavailable_database():
+        raise AssertionError("Liveness must not request a database session")
+        yield
+
+    app.dependency_overrides[get_db] = unavailable_database
+    try:
+        response = client.get("/health")
+    finally:
+        app.dependency_overrides[get_db] = override_get_db
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "healthy"}
+
+
+def test_readiness_when_database_is_unavailable():
+    class UnavailableSession:
+        def execute(self, statement):
+            raise SQLAlchemyError("database is unavailable")
+
+    def unavailable_database():
+        yield UnavailableSession()
+
+    app.dependency_overrides[get_db] = unavailable_database
+    try:
+        response = client.get("/ready")
+    finally:
+        app.dependency_overrides[get_db] = override_get_db
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database is unavailable"}
 
 
 def test_create_and_list_task():

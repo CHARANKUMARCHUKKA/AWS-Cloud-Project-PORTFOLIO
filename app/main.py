@@ -1,13 +1,11 @@
 
-from contextlib import asynccontextmanager
-
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
 from app.models import TaskRecord
 
 
@@ -29,17 +27,10 @@ def get_db():
         db.close()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
-
-
 app = FastAPI(
     title="AWS Task Management API",
     version="1.0.0",
     description="A cloud engineering portfolio project",
-    lifespan=lifespan,
 )
 
 

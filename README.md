@@ -45,6 +45,29 @@ budget, before compute, logging, database, and data-transfer charges. Keep
 destroy approved demo resources promptly. No `terraform apply` is run by this
 repository workflow.
 
+## DATABASE MIGRATIONS
+
+The API never creates or alters database tables at startup. Apply schema
+changes through Alembic as a controlled deployment step before rolling out new
+application tasks:
+
+```powershell
+# Load local, non-committed environment values before running this command.
+alembic upgrade head
+```
+
+For a new schema change, create and review a migration before committing it:
+
+```powershell
+alembic revision --autogenerate -m "describe the schema change"
+alembic upgrade head
+```
+
+In deployment, run `alembic upgrade head` from a one-off, network-authorized
+release task that can reach the private database. Do not run migrations from
+every API task at startup; doing so risks concurrent schema changes during a
+rollout.
+
 ## FUTURE WORK
 
 - AWS networking and security
