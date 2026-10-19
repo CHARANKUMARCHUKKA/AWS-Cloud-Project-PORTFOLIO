@@ -37,3 +37,13 @@ output "ecr_repository_url" {
   description = "URL of the ECR repository for the API image."
   value       = aws_ecr_repository.api.repository_url
 }
+
+output "ecs_cluster_name" {
+  description = "Name of the ECS cluster."
+  value       = aws_ecs_cluster.main.name
+}
+
+output "api_load_balancer_dns_name" {
+  description = "Public DNS name of the API ALB when the ECS service is enabled."
+  value       = try(aws_lb.api[0].dns_name, null)
+}

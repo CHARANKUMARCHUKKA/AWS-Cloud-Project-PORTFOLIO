@@ -20,3 +20,51 @@ variable "project_name" {
   type        = string
   default     = "aws-cloud-project-portfolio"
 }
+
+variable "enable_ecs_service" {
+  description = "Create the public ALB and running ECS service. Disabled by default to avoid recurring compute and ALB charges."
+  type        = bool
+  default     = false
+}
+
+variable "container_image_tag" {
+  description = "Immutable ECR image tag to deploy. Supply a commit SHA or release version, never a mutable tag."
+  type        = string
+  default     = "replace-with-immutable-image-tag"
+
+  validation {
+    condition     = var.container_image_tag != "latest"
+    error_message = "container_image_tag must be an immutable tag, not latest."
+  }
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN for the HTTPS ALB listener. Required when enable_ecs_service is true."
+  type        = string
+  default     = null
+}
+
+variable "database_host" {
+  description = "Private DNS name or endpoint of the MySQL database. Required when enable_ecs_service is true."
+  type        = string
+  default     = null
+}
+
+variable "database_name" {
+  description = "Name of the MySQL database used by the API."
+  type        = string
+  default     = "tasks_db"
+}
+
+variable "database_port" {
+  description = "Port of the MySQL database."
+  type        = number
+  default     = 3306
+}
+
+variable "database_credentials_secret_arn" {
+  description = "Secrets Manager ARN containing JSON keys username and password. Required when enable_ecs_service is true."
+  type        = string
+  default     = null
+  sensitive   = true
+}
