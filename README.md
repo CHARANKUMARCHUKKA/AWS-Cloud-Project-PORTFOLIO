@@ -68,6 +68,28 @@ release task that can reach the private database. Do not run migrations from
 every API task at startup; doing so risks concurrent schema changes during a
 rollout.
 
+## CONTAINER BUILDS
+
+The default image is a small, non-root API runtime. It installs only the
+runtime dependency set; test and migration packages are excluded. Dependencies
+are constrained to the exact versions in `requirements/constraints.txt` for
+repeatable builds. Refresh that file deliberately after testing dependency
+updates.
+
+```powershell
+# API runtime image
+docker build --tag task-api:local .
+
+# Controlled migration image; it does not run as part of the API image startup.
+docker build --target migration --tag task-api-migrations:local .
+```
+
+The build context excludes `.env`, virtual environments, tests, Git metadata,
+and Terraform artifacts. Pass credentials only at container runtime through
+your secret-management mechanism; never bake them into an image or build
+argument. Run the migration image as a one-off release step with database
+network access before deploying new API tasks.
+
 ## FUTURE WORK
 
 - AWS networking and security
