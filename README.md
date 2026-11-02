@@ -29,6 +29,8 @@ Build and deploy a secure, monitored, and cost-conscious task management API usi
 - Terraform infrastructure: VPC, subnets, ECR, ECS cluster, IAM roles, and guarded ALB/ECS
 - Amazon RDS for MySQL and Secrets Manager configuration with cost guards
 - One-off Alembic migration task definition for release automation
+- CloudWatch monitoring: metric alarms (ECS CPU/memory, ALB 5XX, RDS CPU) and operational dashboard
+- GitHub Actions automated CD workflow with AWS OIDC authentication
 - AWS deployment planned
 
 ## DEPLOYMENT SAFETY AND COSTS
@@ -97,6 +99,5 @@ network access before deploying new API tasks.
 
 ## FUTURE WORK
 
-- GitHub Actions CI/CD deployment with AWS OIDC
-- Amazon CloudWatch alarms & observability dashboard
-- Infrastructure cost and security review
+- Infrastructure cost optimization and security audit
+- Production domain and custom route configuration (Route 53)

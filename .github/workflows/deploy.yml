@@ -1,0 +1,153 @@
+name: CD Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_migrations:
+        description: "Run one-off database migration task before deploying"
+        type: boolean
+        default: true
+      deploy_service:
+        description: "Update ECS Fargate service with the newly built image"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: aws-cloud-project-portfolio-api
+  ECS_CLUSTER: aws-cloud-project-portfolio-dev
+  ECS_SERVICE: aws-cloud-project-portfolio-dev-api
+
+jobs:
+  build-and-deploy:
+    name: Build, Migrate, and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: vars
+        run: echo "image_tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActionsECSDeploy
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: runtime
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}
+
+      - name: Build and push migration image
+        if: ${{ inputs.run_migrations }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: migration
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}-migration
+
+      - name: Run database migration task
+        if: ${{ inputs.run_migrations }}
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
+        run: |
+          echo "Running Alembic database migration task..."
+          TASK_DEF_FAMILY="${ECS_CLUSTER}-migration"
+          
+          # Fetch network configuration from active API service or subnets
+          SUBNETS=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query "services[0].networkConfiguration.awsvpcConfiguration.subnets" --output json | jq -r 'join(",")')
+          SECURITY_GROUPS=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query "services[0].networkConfiguration.awsvpcConfiguration.securityGroups" --output json | jq -r 'join(",")')
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_DEF_FAMILY" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUPS],assignPublicIp=ENABLED}" \
+            --overrides "{\"containerOverrides\": [{\"name\": \"migration\", \"image\": \"$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG-migration\"}]}" \
+            --query "tasks[0].taskArn" --output text)
+
+          echo "Started migration task: $TASK_ARN"
+          echo "Waiting for migration task to complete..."
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
+            --query "tasks[0].containers[0].exitCode" --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "Migration task failed with exit code $EXIT_CODE"
+            aws logs get-log-events \
+              --log-group-name "/ecs/$ECS_CLUSTER/api" \
+              --log-stream-name "migration/migration/$(basename "$TASK_ARN")" \
+              --limit 50 || true
+            exit 1
+          fi
+
+          echo "Database migrations completed successfully."
+
+      - name: Update ECS service
+        if: ${{ inputs.deploy_service }}
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
+        run: |
+          echo "Updating ECS service $ECS_SERVICE with image $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG..."
+          
+          # Retrieve existing task definition
+          TASK_DEF=$(aws ecs describe-task-definition --task-definition "$ECS_SERVICE")
+          
+          # Update the image in the container definition
+          NEW_CONTAINER_DEFS=$(echo "$TASK_DEF" | jq --arg IMAGE "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            '.taskDefinition.containerDefinitions | map(if .name == "api" then .image = $IMAGE else . end)')
+          
+          EXECUTION_ROLE_ARN=$(echo "$TASK_DEF" | jq -r '.taskDefinition.executionRoleArn')
+          CPU=$(echo "$TASK_DEF" | jq -r '.taskDefinition.cpu')
+          MEMORY=$(echo "$TASK_DEF" | jq -r '.taskDefinition.memory')
+
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --family "$ECS_SERVICE" \
+            --requires-compatibilities FARGATE \
+            --network-mode awsvpc \
+            --cpu "$CPU" \
+            --memory "$MEMORY" \
+            --execution-role-arn "$EXECUTION_ROLE_ARN" \
+            --container-definitions "$NEW_CONTAINER_DEFS" \
+            --query "taskDefinition.taskDefinitionArn" --output text)
+
+          echo "Registered new task definition: $NEW_TASK_DEF_ARN"
+
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$NEW_TASK_DEF_ARN" \
+            --force-new-deployment
+
+          echo "Waiting for ECS service deployment to stabilize..."
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          echo "Deployment succeeded."

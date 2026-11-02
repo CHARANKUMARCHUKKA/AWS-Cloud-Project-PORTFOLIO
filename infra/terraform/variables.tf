@@ -39,6 +39,18 @@ variable "enable_database_secrets" {
   default     = false
 }
 
+variable "enable_monitoring" {
+  description = "Create CloudWatch alarms and SNS notification topics. Disabled by default to avoid unnecessary notifications/resources."
+  type        = bool
+  default     = false
+}
+
+variable "alarm_email" {
+  description = "Optional email address to receive CloudWatch alarm notifications via SNS."
+  type        = string
+  default     = null
+}
+
 variable "db_instance_class" {
   description = "Compute and memory capacity class of the RDS MySQL instance."
   type        = string

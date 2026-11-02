@@ -64,3 +64,13 @@ output "migration_task_definition_arn" {
   description = "ARN of the Alembic migration task definition."
   value       = try(aws_ecs_task_definition.migration[0].arn, null)
 }
+
+output "sns_alerts_topic_arn" {
+  description = "ARN of the SNS topic for CloudWatch alarms."
+  value       = try(aws_sns_topic.alerts[0].arn, null)
+}
+
+output "cloudwatch_dashboard_name" {
+  description = "Name of the CloudWatch overview dashboard."
+  value       = try(aws_cloudwatch_dashboard.api[0].dashboard_name, null)
+}
